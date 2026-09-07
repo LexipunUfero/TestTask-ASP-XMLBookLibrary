@@ -9,7 +9,7 @@ using XMLBookLibrary.XmlDataManagement.FileOrganization.FileTree;
 
 namespace XMLBookLibrary.XmlDataManagement;
 
-public class XmlBooksLibrary
+public class XmlBooksLibrary : IDisposable
 {
     private Dictionary<int, string> cachedBooks = new Dictionary<int, string>();
 
@@ -64,15 +64,38 @@ public class XmlBooksLibrary
             }
         }
 
-        foreach (var book in initialData.Books)
+        if (initialData.Books.Count > 0)
         {
-            bookLibrary.Add(book);
+            bookLibrary = new FileTree(0, initialData.Books[0].From[0], initialData.Books[0].File);
+            if (!File.Exists(Path.Combine(Path.Combine(configs.PathToSave, fileConfigs.bookDirectory),
+                    bookLibrary.FilePath)))
+            {
+                File.Create(Path.Combine(Path.Combine(configs.PathToSave, fileConfigs.bookDirectory),
+                    bookLibrary.FilePath)).Close();
+            }
+
+            foreach (var book in initialData.Books)
+            {
+                bookLibrary.Add(book);
+            }
         }
 
-        foreach (var author in initialData.Authors)
+        if (initialData.Authors.Count > 0)
         {
-            authorLibrary.Add(author);
+            authorLibrary = new FileTree(0, initialData.Authors[0].From[0], initialData.Authors[0].File);
+            if (!File.Exists(Path.Combine(Path.Combine(configs.PathToSave, fileConfigs.authorDirectory),
+                    bookLibrary.FilePath)))
+            {
+                File.Create(Path.Combine(Path.Combine(configs.PathToSave, fileConfigs.authorDirectory),
+                    bookLibrary.FilePath)).Close();
+            }
+
+            foreach (var author in initialData.Authors)
+            {
+                authorLibrary.Add(author);
+            }
         }
+
 
         lastBookIndex = initialData.LastBookFileIndex;
         lastAuthorIndex = initialData.LastAuthorFileIndex;
@@ -434,6 +457,11 @@ public class XmlBooksLibrary
 
     ~XmlBooksLibrary()
     {
+        ReleaseUnmanagedResources();
+    }
+
+    private void ReleaseUnmanagedResources()
+    {
         var indexFile = Path.Combine(configs.PathToSave!, fileConfigs.indexFile);
         var data = new FileSystemIndexDTO
         {
@@ -442,10 +470,15 @@ public class XmlBooksLibrary
             LastBookId = lastBookId,
             Authors = authorLibrary.GetData(),
             Books = bookLibrary.GetData(),
-
         };
-        
+
         using var reader = new StreamWriter(indexFile);
         reader.Write(JsonSerializer.Serialize(data));
+    }
+
+    public void Dispose()
+    {
+        ReleaseUnmanagedResources();
+        GC.SuppressFinalize(this);
     }
 }
